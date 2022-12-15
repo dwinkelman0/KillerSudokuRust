@@ -43,7 +43,32 @@ impl Puzzle {
         output
     }
 
-    pub fn init_random_board(&mut self) {}
+    pub fn init_cages(puzzle: &Rc<RefCell<Self>>, cages: Vec<(usize, Vec<usize>)>) {
+        for (sum, cells) in cages {
+            puzzle.borrow_mut().cages.push(Cage {
+                puzzle: puzzle.clone(),
+                cells,
+                sum,
+            });
+        }
+        let check = puzzle.borrow().check_cages(4);
+        if check.len() > 0 {
+            panic!("Cells in cages are not balanced: {:?}", check);
+        }
+    }
+
+    fn check_cages(&self, expected: usize) -> Vec<(usize, usize)> {
+        let mut sums: [usize; 81] = [0; 81];
+        for cage in self.cages.iter() {
+            for cell in cage.cells.iter() {
+                sums[*cell] += 1;
+            }
+        }
+        sums.iter()
+            .enumerate()
+            .filter_map(|(index, sum)| (*sum != expected).then_some((index, *sum)))
+            .collect()
+    }
 }
 
 impl Display for Puzzle {
