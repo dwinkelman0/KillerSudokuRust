@@ -1,7 +1,7 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
 use crate::ks::{cage::Cage, cell::Cell};
-use std::{cell::RefCell, fmt::Display, rc::Rc};
+use std::fmt::Display;
 
 pub struct Puzzle {
     pub board: [Cell; 81],
@@ -9,29 +9,26 @@ pub struct Puzzle {
 }
 
 impl Puzzle {
-    pub fn new() -> Rc<RefCell<Self>> {
-        let mut output = Rc::new(RefCell::new(Self {
+    pub fn new() -> Self {
+        let mut output = Self {
             board: [Cell::default(); 81],
             cages: vec![],
-        }));
+        };
         for i in 0..9 {
-            output.borrow_mut().cages.push(Cage {
-                puzzle: output.clone(),
+            output.cages.push(Cage {
                 cells: ((i * 9)..((i + 1) * 9)).collect(),
                 sum: 45,
             });
         }
         for i in 0..9 {
-            output.borrow_mut().cages.push(Cage {
-                puzzle: output.clone(),
+            output.cages.push(Cage {
                 cells: (0..9).map(|j| j * 9 + i).collect(),
                 sum: 45,
             });
         }
         for i in 0..3 {
             for j in 0..3 {
-                output.borrow_mut().cages.push(Cage {
-                    puzzle: output.clone(),
+                output.cages.push(Cage {
                     cells: (0..3)
                         .map(|ii| (0..3).map(move |jj| (i * 3 + ii) * 9 + (j * 3 + jj)))
                         .flatten()
@@ -43,15 +40,11 @@ impl Puzzle {
         output
     }
 
-    pub fn init_cages(puzzle: &Rc<RefCell<Self>>, cages: Vec<(usize, Vec<usize>)>) {
+    pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>) {
         for (sum, cells) in cages {
-            puzzle.borrow_mut().cages.push(Cage {
-                puzzle: puzzle.clone(),
-                cells,
-                sum,
-            });
+            self.cages.push(Cage { cells, sum });
         }
-        let check = puzzle.borrow().check_cages(4);
+        let check = self.check_cages(4);
         if check.len() > 0 {
             panic!("Cells in cages are not balanced: {:?}", check);
         }
@@ -68,6 +61,19 @@ impl Puzzle {
             .enumerate()
             .filter_map(|(index, sum)| (*sum != expected).then_some((index, *sum)))
             .collect()
+    }
+
+    pub fn solve(&mut self) -> bool {
+        while self
+            .cages
+            .iter_mut()
+            .any(|cage| cage.restrict(&mut self.board))
+        {
+            println!("Made progress");
+        }
+
+        /* Final return value */
+        self.board.iter().all(|cell| cell.get_solution().is_some())
     }
 }
 

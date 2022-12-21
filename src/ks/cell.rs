@@ -1,6 +1,6 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
-use crate::ks::util::onehot;
+use crate::ks::util::{onehot, popcnt64};
 use std::fmt::Display;
 
 #[derive(Clone, Copy)]
@@ -20,12 +20,20 @@ impl Cell {
         (self.possible_values >> value) & 1 == 1
     }
 
-    pub fn restrict_to(&mut self, possible_values: u64) {
-        self.possible_values &= possible_values;
+    pub fn num_possible_solutions(&self) -> usize {
+        popcnt64(self.possible_values)
     }
 
-    pub fn remove(&mut self, removed_values: u64) {
+    pub fn restrict_to(&mut self, possible_values: u64) -> bool {
+        let orig = self.possible_values;
+        self.possible_values &= possible_values;
+        self.possible_values != orig
+    }
+
+    pub fn remove(&mut self, removed_values: u64) -> bool {
+        let orig = self.possible_values;
         self.possible_values &= !removed_values;
+        self.possible_values != orig
     }
 
     pub fn fold_possible_sums(&self, sums: u64) -> u64 {
