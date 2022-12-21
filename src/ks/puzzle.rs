@@ -64,12 +64,15 @@ impl Puzzle {
     }
 
     pub fn solve(&mut self) -> bool {
-        while self
-            .cages
-            .iter_mut()
-            .any(|cage| cage.restrict(&mut self.board))
-        {
-            println!("Made progress");
+        loop {
+            // TODO: turn off short-circuit evalution
+            let any_progress = self.cages.iter_mut().fold(false, |any_progress, cage| {
+                any_progress || cage.restrict(&mut self.board)
+            });
+            match any_progress {
+                true => println!("Made progress"),
+                false => break,
+            }
         }
 
         /* Final return value */

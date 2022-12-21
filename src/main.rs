@@ -42,4 +42,5 @@ fn main() {
         (21, vec![77, 78, 79, 80]),
     ]);
     println!("Found solution: {}", p.solve());
+    println!("{p}");
 }

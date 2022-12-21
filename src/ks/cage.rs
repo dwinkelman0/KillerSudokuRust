@@ -41,27 +41,56 @@ impl Cage {
     /// Returns true if progress was made
     fn restrict_subset(
         &self,
-        current_cell: usize,
-        unsolved_cells: &[usize],
-        remaining_sum: usize,
+        current_cell: Cell,
+        unsolved_cells: &[Cell],
+        remaining_sum: u64,
         remaining_numbers: u64,
-    ) -> bool {
-        println!("{current_cell}");
-
-        /* Recurse */
-        match unsolved_cells.first() {
-            Some(next_current_cell) => {
-                let mut it = unsolved_cells.iter();
-                it.next();
-                self.restrict_subset(
-                    *next_current_cell,
-                    it.as_slice(),
-                    remaining_sum,
-                    remaining_numbers,
-                )
+    ) -> Vec<Cell> {
+        match unsolved_cells.len() {
+            0 => {
+                /* Only one cell left */
+                vec![current_cell.restrict_to(remaining_sum & remaining_numbers)]
             }
-            None => false,
+            1 => {
+                /* Only two cells left */
+                let mut cell_a = current_cell;
+                let mut cell_b = *unsolved_cells.first().unwrap();
+                loop {
+                    let new_cell_a = cell_a.pairwise_restriction(cell_b, remaining_sum);
+                    let new_cell_b = cell_b.pairwise_restriction(cell_a, remaining_sum);
+                    if new_cell_a == cell_a && new_cell_b == cell_b {
+                        return vec![new_cell_a, new_cell_b];
+                    } else {
+                        cell_a = new_cell_a;
+                        cell_b = new_cell_b;
+                    }
+                }
+            }
+            _ => {
+                // Give up for now
+                let mut output = vec![current_cell];
+                for cell in unsolved_cells {
+                    output.push(cell.clone())
+                }
+                output
+            }
         }
+
+        // /* Recurse */
+        // match unsolved_cells.first() {
+        //     Some(next_current_cell) => {
+        //         let mut it = unsolved_cells.iter();
+        //         it.next();
+        //         self.restrict_subset(
+        //             board,
+        //             *next_current_cell,
+        //             it.as_slice(),
+        //             remaining_sum,
+        //             remaining_numbers,
+        //         )
+        //     }
+        //     None => false,
+        // }
     }
 
     /// Returns true if progress was made
@@ -80,22 +109,39 @@ impl Cage {
                 .cells
                 .clone()
                 .into_iter()
-                .filter(|cell_index| {
-                    board[*cell_index].restrict_to(remaining_numbers);
-                    board[*cell_index].get_solution().is_none()
+                .filter_map(|cell_index| match board[cell_index].get_solution() {
+                    Some(_) => None,
+                    None => {
+                        board[cell_index].restrict_to(remaining_numbers);
+                        board[cell_index]
+                            .get_solution()
+                            .is_none()
+                            .then(|| (cell_index, board[cell_index]))
+                    }
                 })
-                .collect::<Vec<usize>>();
+                .collect::<Vec<(usize, Cell)>>();
 
             /* Recursively search solution space */
-            unsolved_cells.sort_by_key(|cell_index| board[*cell_index].num_possible_solutions());
-            let mut it = unsolved_cells.iter();
+            unsolved_cells.sort_by_key(|(index, cell)| cell.num_possible_solutions());
+            let cells_to_solve = unsolved_cells
+                .iter()
+                .map(|(_, cell)| *cell)
+                .collect::<Vec<Cell>>();
+            let mut it = cells_to_solve.iter();
             it.next();
-            self.restrict_subset(
-                *unsolved_cells.first().unwrap(),
+            let solved_cells = self.restrict_subset(
+                *cells_to_solve.first().unwrap(),
                 &it.as_slice(),
-                remaining_sum,
+                1 << remaining_sum,
                 remaining_numbers,
             );
+
+            for (i, (index, _)) in unsolved_cells.into_iter().enumerate() {
+                if solved_cells[i] != board[index] {
+                    println!("Updated {index} to {}", solved_cells[i]);
+                }
+                board[index] = solved_cells[i];
+            }
 
             /* Check whether progress was made */
             self.get_degrees_of_freedom(board) < initial_degrees_of_freedom

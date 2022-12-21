@@ -3,7 +3,7 @@
 use crate::ks::util::{onehot, popcnt64};
 use std::fmt::Display;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct Cell {
     possible_values: u64,
 }
@@ -24,16 +24,22 @@ impl Cell {
         popcnt64(self.possible_values)
     }
 
-    pub fn restrict_to(&mut self, possible_values: u64) -> bool {
-        let orig = self.possible_values;
-        self.possible_values &= possible_values;
-        self.possible_values != orig
+    pub fn restrict_to(&self, possible_values: u64) -> Self {
+        Cell {
+            possible_values: self.possible_values & possible_values,
+        }
     }
 
-    pub fn remove(&mut self, removed_values: u64) -> bool {
-        let orig = self.possible_values;
-        self.possible_values &= !removed_values;
-        self.possible_values != orig
+    pub fn pairwise_restriction(&self, other: Cell, possible_sums: u64) -> Cell {
+        self.possible_values().fold(*self, |output, cell_value| {
+            let sums = possible_sums >> cell_value;
+            let restricted = other.restrict_to(!(1 << cell_value));
+            if (restricted.possible_values & sums) == 0 {
+                output.restrict_to(!(1 << cell_value))
+            } else {
+                output
+            }
+        })
     }
 
     pub fn fold_possible_sums(&self, sums: u64) -> u64 {
@@ -47,6 +53,10 @@ impl Cell {
         }
         output
     }
+
+    pub fn possible_values(&self) -> PossibleValues {
+        PossibleValues::new(self.possible_values)
+    }
 }
 
 impl Default for Cell {
@@ -59,13 +69,39 @@ impl Default for Cell {
 
 impl Display for Cell {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:?}",
-            (1..=9)
-                .filter(|index| self.allows(*index))
-                .collect::<Vec<usize>>()
-        )
+        write!(f, "{:?}", self.possible_values().collect::<Vec<usize>>())
+    }
+}
+
+pub struct PossibleValues {
+    bitmask: u64,
+    index: usize,
+}
+
+impl PossibleValues {
+    pub fn new(bitmask: u64) -> Self {
+        Self { bitmask, index: 0 }
+    }
+}
+
+impl Iterator for PossibleValues {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.bitmask == 0 {
+            None
+        } else {
+            for i in self.index..64 {
+                if self.bitmask & 1 == 1 {
+                    self.bitmask >>= 1;
+                    self.index = i + 1;
+                    return Some(i);
+                } else {
+                    self.bitmask >>= 1;
+                }
+            }
+            panic!("Should be unreachable");
+        }
     }
 }
 
@@ -79,7 +115,7 @@ mod tests {
         assert_eq!(c.get_solution(), None);
         assert!(c.allows(1));
         assert!(c.allows(3));
-        c.restrict_to(1 << 3);
+        c = c.restrict_to(1 << 3);
         assert_eq!(c.get_solution(), Some(3));
         assert!(!c.allows(1));
         assert!(c.allows(3));
@@ -95,7 +131,14 @@ mod tests {
         };
         let sum = c2.fold_possible_sums(c1.fold_possible_sums(1)); // 6..12
         assert_eq!(sum, 0x1fc0);
+    }
 
-        let it = vec![c1, c2].iter();
+    #[test]
+    fn test_possible_values_iterator() {
+        let possible_values = PossibleValues::new(0x108f);
+        assert_eq!(
+            possible_values.collect::<Vec<usize>>(),
+            vec![0, 1, 2, 3, 7, 12]
+        );
     }
 }
