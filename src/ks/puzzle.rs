@@ -92,7 +92,10 @@ impl Puzzle {
                 .collect::<Vec<String>>()
                 .join(", "),
         );
+        let initial_complexity = self.get_cell_solvability_distribution();
         self.cages.append(&mut new_cages);
+        let final_complexity = self.get_cell_solvability_distribution();
+        println!("Cell solvability distribution changed from {initial_complexity:?} to {final_complexity:?}");
     }
 
     pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>) {
@@ -117,6 +120,21 @@ impl Puzzle {
             .enumerate()
             .filter_map(|(index, sum)| (*sum != expected).then_some((index, *sum)))
             .collect()
+    }
+
+    /// For each cell, take the size of the smallest cage of which it is a member, and aggregate
+    pub fn get_cell_solvability_distribution(&self) -> BTreeMap<usize, usize> {
+        let mut minimal_cage_size = vec![9; 81];
+        for cage in self.cages.iter() {
+            for cell in cage.cells.iter() {
+                minimal_cage_size[*cell] = minimal_cage_size[*cell].min(cage.cells.len());
+            }
+        }
+        let mut cage_size_count = BTreeMap::new();
+        for size in minimal_cage_size {
+            *cage_size_count.entry(size).or_insert(0) += 1;
+        }
+        cage_size_count
     }
 
     pub fn solve(&mut self) -> bool {
