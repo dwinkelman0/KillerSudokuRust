@@ -4,12 +4,26 @@ use std::fmt::Display;
 
 use crate::ks::cell::Cell;
 
+#[derive(Clone)]
 pub struct Cage {
     pub cells: Vec<usize>,
     pub sum: usize,
 }
 
 impl Cage {
+    pub fn new(cells: Vec<usize>, sum: usize) -> Self {
+        let mut output = Self { cells, sum };
+        output.cells.sort();
+        output
+    }
+
+    pub fn empty() -> Self {
+        Cage {
+            cells: vec![],
+            sum: 0,
+        }
+    }
+
     pub fn get_possible_sums(&self, board: &[Cell; 81]) -> u64 {
         self.cells
             .iter()
@@ -36,6 +50,57 @@ impl Cage {
             .iter()
             .map(|cell_index| board[*cell_index].num_possible_solutions())
             .sum()
+    }
+
+    pub fn merge(&self, other: &Self) -> Self {
+        let mut output = self.clone();
+        other
+            .cells
+            .iter()
+            .for_each(|cell_index| output.cells.push(*cell_index));
+        output.cells.sort();
+        output.sum += other.sum;
+        output
+    }
+
+    /// let A = self, B = other; returns (A intersect B, A - B, B - A)
+    pub fn get_intersection_and_difference(
+        &self,
+        other: &Self,
+    ) -> (Vec<usize>, Vec<usize>, Vec<usize>) {
+        let mut intersection = vec![];
+        let mut difference_a = vec![];
+        let mut difference_b = vec![];
+        let mut a_it = self.cells.iter();
+        let mut b_it = other.cells.iter();
+        let mut a = a_it.next();
+        let mut b = b_it.next();
+        while let (Some(a_value), Some(b_value)) = (a, b) {
+            match a_value.cmp(b_value) {
+                std::cmp::Ordering::Equal => {
+                    intersection.push(*a_value);
+                    a = a_it.next();
+                    b = b_it.next();
+                }
+                std::cmp::Ordering::Less => {
+                    difference_a.push(*a_value);
+                    a = a_it.next();
+                }
+                std::cmp::Ordering::Greater => {
+                    difference_b.push(*b_value);
+                    b = b_it.next();
+                }
+            }
+        }
+        while let Some(a_value) = a {
+            difference_a.push(*a_value);
+            a = a_it.next();
+        }
+        while let Some(b_value) = b {
+            difference_b.push(*b_value);
+            b = b_it.next();
+        }
+        (intersection, difference_a, difference_b)
     }
 
     /// Returns true if progress was made
@@ -112,11 +177,11 @@ impl Cage {
                 .filter_map(|cell_index| match board[cell_index].get_solution() {
                     Some(_) => None,
                     None => {
-                        board[cell_index].restrict_to(remaining_numbers);
-                        board[cell_index]
+                        let restricted = board[cell_index].restrict_to(remaining_numbers);
+                        restricted
                             .get_solution()
                             .is_none()
-                            .then(|| (cell_index, board[cell_index]))
+                            .then(|| (cell_index, restricted))
                     }
                 })
                 .collect::<Vec<(usize, Cell)>>();
@@ -151,6 +216,6 @@ impl Cage {
 
 impl Display for Cage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.cells)
+        write!(f, "{:?} = {}", self.cells, self.sum)
     }
 }
