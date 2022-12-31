@@ -1,6 +1,6 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
-fn get_combinations(num_cells: usize, sum: usize) -> Vec<u64> {
+pub fn get_combinations(num_cells: usize, sum: usize) -> Vec<u64> {
     fn recurse(
         num_cells: usize,
         sum: usize,
@@ -38,7 +38,7 @@ fn get_combinations(num_cells: usize, sum: usize) -> Vec<u64> {
     output
 }
 
-fn get_combinations_union(num_cells: usize, sum: usize) -> u64 {
+pub fn get_combinations_union(num_cells: usize, sum: usize) -> u64 {
     get_combinations(num_cells, sum)
         .into_iter()
         .fold(0, |accum, x| accum | x)

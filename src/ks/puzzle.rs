@@ -1,51 +1,53 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
 use crate::ks::{cage::Cage, cell::Cell};
-use std::{collections::BTreeMap, fmt::Display};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Display,
+};
 
 pub struct Puzzle {
     pub board: [Cell; 81],
-    cages: Vec<Cage>,
+    cages: BTreeSet<Cage>,
 }
 
 impl Puzzle {
     pub fn new() -> Self {
         let mut output = Self {
             board: [Cell::default(); 81],
-            cages: vec![],
+            cages: BTreeSet::new(),
         };
         for i in 0..9 {
             output
                 .cages
-                .push(Cage::new(((i * 9)..((i + 1) * 9)).collect(), 45));
+                .insert(Cage::new(((i * 9)..((i + 1) * 9)).collect(), 45));
         }
         for i in 0..9 {
             output
                 .cages
-                .push(Cage::new((0..9).map(|j| j * 9 + i).collect(), 45));
+                .insert(Cage::new((0..9).map(|j| j * 9 + i).collect(), 45));
         }
         for i in 0..3 {
             for j in 0..3 {
-                output.cages.push(Cage::new(
+                output.cages.insert(Cage::new(
                     (0..3)
                         .map(|ii| (0..3).map(move |jj| (i * 3 + ii) * 9 + (j * 3 + jj)))
                         .flatten()
                         .collect(),
                     45,
-                ))
+                ));
             }
         }
         output
     }
 
     fn derive_cages(&mut self) {
+        const MAX_DERIVED_CAGE_SIZE: usize = 8;
         /* For each top-level cage, see which other cages are completely contained or overlap */
-        const TOP_LEVEL_CAGES: std::ops::Range<usize> = 0..27;
         let derive_cages = |parent_cage: &Cage| -> Vec<Cage> {
             let mut parent_cage = parent_cage.clone();
             let mut excess_cage = Cage::empty();
-            for child_cage_index in 27..self.cages.len() {
-                let child_cage = &self.cages[child_cage_index];
+            for child_cage in self.cages.iter().filter(|cage| cage.cells.len() < 9) {
                 let (intersection, parent_difference, child_difference) =
                     parent_cage.get_intersection_and_difference(child_cage);
                 if child_difference.len() == 0 {
@@ -68,17 +70,20 @@ impl Puzzle {
                     excess_cage.sum - parent_cage.sum,
                 ));
             }
-            if 0 < parent_cage.cells.len() && parent_cage.cells.len() <= 4 {
+            if 0 < parent_cage.cells.len() && parent_cage.cells.len() <= MAX_DERIVED_CAGE_SIZE {
                 /* There are some cells leftover from the parent cage */
                 output.push(parent_cage);
             }
             output
         };
 
-        let mut new_cages = TOP_LEVEL_CAGES
-            .map(|top_level_cage_index| derive_cages(&self.cages[top_level_cage_index]))
+        let mut new_cages = self
+            .cages
+            .iter()
+            .filter(|cage| cage.cells.len() == 9)
+            .map(|cage| derive_cages(cage))
             .flatten()
-            .collect::<Vec<Cage>>();
+            .collect::<BTreeSet<Cage>>();
         let mut cage_len_count = BTreeMap::new();
         for cage in new_cages.iter() {
             *cage_len_count.entry(cage.cells.len()).or_insert(0) += 1;
@@ -92,15 +97,16 @@ impl Puzzle {
                 .collect::<Vec<String>>()
                 .join(", "),
         );
-        let initial_complexity = self.get_cell_solvability_distribution();
         self.cages.append(&mut new_cages);
-        let final_complexity = self.get_cell_solvability_distribution();
-        println!("Cell solvability distribution changed from {initial_complexity:?} to {final_complexity:?}");
+        println!(
+            "solvability = {:?}",
+            self.get_cell_solvability_distribution()
+        );
     }
 
     pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>) {
         for (sum, cells) in cages {
-            self.cages.push(Cage::new(cells, sum));
+            self.cages.insert(Cage::new(cells, sum));
         }
         let check = self.check_cages(4);
         if check.len() > 0 {
@@ -138,16 +144,48 @@ impl Puzzle {
     }
 
     pub fn solve(&mut self) -> bool {
+        self.cages.iter().for_each(|cage| {
+            cage.restrict_by_uniform_combination(&mut self.board);
+        });
         loop {
-            // TODO: turn off short-circuit evalution
-            let any_progress = self.cages.iter_mut().fold(false, |any_progress, cage| {
-                any_progress || cage.restrict(&mut self.board)
-            });
-            match any_progress {
-                true => println!("Made progress"),
-                false => break,
+            let partitions = self
+                .cages
+                .iter()
+                .filter_map(|cage| {
+                    cage.check_for_partition(&mut self.board)
+                        .map(|p| (cage.clone(), p))
+                })
+                .collect::<Vec<(Cage, Vec<Cage>)>>();
+            match partitions.len() {
+                0 => break,
+                _ => {
+                    let init_num_cages = self.cages.len();
+                    partitions
+                        .into_iter()
+                        .rev()
+                        .for_each(|(original_cage, new_cages)| {
+                            self.cages.remove(&original_cage);
+                            new_cages.into_iter().for_each(|new_cage| {
+                                self.cages.insert(new_cage);
+                            });
+                        });
+                }
             }
+            println!(
+                "solvability = {:?}",
+                self.get_cell_solvability_distribution()
+            );
         }
+        // loop {
+        //     // TODO: turn off short-circuit evalution
+        //     let any_progress = self.cages.iter_mut().fold(false, |any_progress, cage| {
+        //         any_progress || cage.restrict(&mut self.board)
+        //     });
+        //     match any_progress {
+        //         true => println!("Made progress"),
+        //         false => break,
+        //     }
+        // }
 
         /* Final return value */
         self.board.iter().all(|cell| cell.get_solution().is_some())

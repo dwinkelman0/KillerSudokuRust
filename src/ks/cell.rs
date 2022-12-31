@@ -1,5 +1,6 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
+use crate::ks::combinations::PossibleValues;
 use crate::ks::util::{onehot, popcnt64};
 use std::fmt::Display;
 
@@ -11,6 +12,10 @@ pub struct Cell {
 impl Cell {
     pub fn get_solution(&self) -> Option<usize> {
         onehot(self.possible_values)
+    }
+
+    pub fn get_bits(&self) -> u64 {
+        self.possible_values
     }
 
     pub fn allows(&self, value: usize) -> bool {
@@ -70,38 +75,6 @@ impl Default for Cell {
 impl Display for Cell {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.possible_values().collect::<Vec<usize>>())
-    }
-}
-
-pub struct PossibleValues {
-    bitmask: u64,
-    index: usize,
-}
-
-impl PossibleValues {
-    pub fn new(bitmask: u64) -> Self {
-        Self { bitmask, index: 0 }
-    }
-}
-
-impl Iterator for PossibleValues {
-    type Item = usize;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.bitmask == 0 {
-            None
-        } else {
-            for i in self.index..64 {
-                if self.bitmask & 1 == 1 {
-                    self.bitmask >>= 1;
-                    self.index = i + 1;
-                    return Some(i);
-                } else {
-                    self.bitmask >>= 1;
-                }
-            }
-            panic!("Should be unreachable");
-        }
     }
 }
 
