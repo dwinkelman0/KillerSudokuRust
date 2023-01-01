@@ -157,29 +157,6 @@ impl Cage {
             v.sort_by_key(|(_, possible_values)| popcnt64(*possible_values));
             v
         };
-        for i in 1..=(possible_values_by_cell.len() - 1) {
-            if let Some((cells, values)) = fold_combinations(0, i, i, &possible_values_by_cell)
-                .first()
-                .cloned()
-            {
-                assert_eq!(popcnt64(cells), popcnt64(values));
-                let new_cage_cells = gather_cell_indices(cells, true);
-                for cell in new_cage_cells.iter() {
-                    board[*cell].restrict_to(values)?;
-                }
-                let new_cage_sum = PossibleValues::new(values).sum::<usize>();
-                let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
-                let remaining_cage_cells = gather_cell_indices(cells, false);
-                for cell in remaining_cage_cells.iter() {
-                    board[*cell].restrict_to(!values)?;
-                }
-                let remaining_cage_sum = self.sum - new_cage_sum;
-                let remaining_cage =
-                    Cage::new(remaining_cage_cells, remaining_cage_sum, self.uniqueness);
-                remaining_cage.restrict_by_uniform_combination(board)?;
-                return Ok(Some((new_cage, remaining_cage)));
-            }
-        }
 
         let possible_cells_by_value = {
             let mut v = (1..=9)
@@ -203,30 +180,45 @@ impl Cage {
             v.sort_by_key(|(_, possible_cells)| popcnt64(*possible_cells));
             v
         };
-        if possible_cells_by_value.len() > self.cells.len() {
-            return Ok(None);
-        }
-        for i in 1..=(possible_cells_by_value.len() - 1) {
-            if let Some((values, cells)) = fold_combinations(0, i, i, &possible_cells_by_value)
+
+        let mut split_partition = |cells: u64, values: u64| {
+            assert_eq!(popcnt64(cells), popcnt64(values));
+            let new_cage_cells = gather_cell_indices(cells, true);
+            for cell in new_cage_cells.iter() {
+                board[*cell].restrict_to(values)?;
+            }
+            let new_cage_sum = PossibleValues::new(values).sum::<usize>();
+            let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
+            let remaining_cage_cells = gather_cell_indices(cells, false);
+            for cell in remaining_cage_cells.iter() {
+                board[*cell].restrict_to(!values)?;
+            }
+            let remaining_cage_sum = self.sum - new_cage_sum;
+            let remaining_cage =
+                Cage::new(remaining_cage_cells, remaining_cage_sum, self.uniqueness);
+            remaining_cage.restrict_by_uniform_combination(board)?;
+            Ok(Some((new_cage, remaining_cage)))
+        };
+
+        for i in 1..=(possible_values_by_cell.len() - 1) {
+            if let Some((cells, values)) = fold_combinations(0, i, i, &possible_values_by_cell)
                 .first()
                 .cloned()
             {
-                assert_eq!(popcnt64(cells), popcnt64(values));
-                let new_cage_cells = gather_cell_indices(cells, true);
-                for cell in new_cage_cells.iter() {
-                    board[*cell].restrict_to(values)?;
+                return split_partition(cells, values);
+            }
+        }
+
+        if possible_cells_by_value.len() > self.cells.len() {
+            return Ok(None);
+        } else {
+            for i in 1..=(possible_cells_by_value.len() - 1) {
+                if let Some((values, cells)) = fold_combinations(0, i, i, &possible_cells_by_value)
+                    .first()
+                    .cloned()
+                {
+                    return split_partition(cells, values);
                 }
-                let new_cage_sum = PossibleValues::new(values).sum::<usize>();
-                let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
-                let remaining_cage_cells = gather_cell_indices(cells, false);
-                for cell in remaining_cage_cells.iter() {
-                    board[*cell].restrict_to(!values)?;
-                }
-                let remaining_cage_sum = self.sum - new_cage_sum;
-                let remaining_cage =
-                    Cage::new(remaining_cage_cells, remaining_cage_sum, self.uniqueness);
-                remaining_cage.restrict_by_uniform_combination(board)?;
-                return Ok(Some((new_cage, remaining_cage)));
             }
         }
 
