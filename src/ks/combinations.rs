@@ -1,5 +1,19 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
+use std::collections::BTreeSet;
+
+pub fn cage_can_have_uniqueness(cells: &Vec<usize>) -> bool {
+    let row_set = cells
+        .iter()
+        .map(|cell_index| cell_index / 9)
+        .collect::<BTreeSet<usize>>();
+    let col_set = cells
+        .iter()
+        .map(|cell_index| cell_index % 9)
+        .collect::<BTreeSet<usize>>();
+    row_set.len() == 1 || col_set.len() == 1
+}
+
 pub fn get_combinations(num_cells: usize, sum: usize) -> Vec<u64> {
     fn recurse(
         num_cells: usize,

@@ -29,34 +29,11 @@ impl Cell {
         popcnt64(self.possible_values)
     }
 
-    pub fn restrict_to(&self, possible_values: u64) -> Self {
-        Cell {
-            possible_values: self.possible_values & possible_values,
+    pub fn restrict_to(&mut self, possible_values: u64) {
+        self.possible_values &= possible_values;
+        if self.possible_values == 0 {
+            panic!()
         }
-    }
-
-    pub fn pairwise_restriction(&self, other: Cell, possible_sums: u64) -> Cell {
-        self.possible_values().fold(*self, |output, cell_value| {
-            let sums = possible_sums >> cell_value;
-            let restricted = other.restrict_to(!(1 << cell_value));
-            if (restricted.possible_values & sums) == 0 {
-                output.restrict_to(!(1 << cell_value))
-            } else {
-                output
-            }
-        })
-    }
-
-    pub fn fold_possible_sums(&self, sums: u64) -> u64 {
-        let mut output = 0;
-        let mut possible_values = self.possible_values;
-        for i in 1..=9 {
-            possible_values >>= 1;
-            if possible_values & 1 == 1 {
-                output |= sums << i;
-            }
-        }
-        output
     }
 
     pub fn possible_values(&self) -> PossibleValues {
@@ -88,22 +65,10 @@ mod tests {
         assert_eq!(c.get_solution(), None);
         assert!(c.allows(1));
         assert!(c.allows(3));
-        c = c.restrict_to(1 << 3);
+        c.restrict_to(1 << 3);
         assert_eq!(c.get_solution(), Some(3));
         assert!(!c.allows(1));
         assert!(c.allows(3));
-    }
-
-    #[test]
-    fn test_cell_fold_sums() {
-        let c1 = Cell {
-            possible_values: 0x01e, // 1..4
-        };
-        let c2 = Cell {
-            possible_values: 0x1e0, // 5..8
-        };
-        let sum = c2.fold_possible_sums(c1.fold_possible_sums(1)); // 6..12
-        assert_eq!(sum, 0x1fc0);
     }
 
     #[test]

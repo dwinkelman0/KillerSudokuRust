@@ -20,12 +20,12 @@ impl Puzzle {
         for i in 0..9 {
             output
                 .cages
-                .insert(Cage::new(((i * 9)..((i + 1) * 9)).collect(), 45));
+                .insert(Cage::new(((i * 9)..((i + 1) * 9)).collect(), 45, true));
         }
         for i in 0..9 {
             output
                 .cages
-                .insert(Cage::new((0..9).map(|j| j * 9 + i).collect(), 45));
+                .insert(Cage::new((0..9).map(|j| j * 9 + i).collect(), 45, true));
         }
         for i in 0..3 {
             for j in 0..3 {
@@ -35,6 +35,7 @@ impl Puzzle {
                         .flatten()
                         .collect(),
                     45,
+                    true,
                 ));
             }
         }
@@ -52,7 +53,8 @@ impl Puzzle {
                     parent_cage.get_intersection_and_difference(child_cage);
                 if child_difference.len() == 0 {
                     /* The child is contained within the parent */
-                    parent_cage = Cage::new(parent_difference, parent_cage.sum - child_cage.sum);
+                    parent_cage =
+                        Cage::new(parent_difference, parent_cage.sum - child_cage.sum, true);
                 } else if intersection.len() > 0 {
                     /* The child at least partially overlaps the parent */
                     excess_cage = excess_cage.merge(child_cage);
@@ -68,6 +70,7 @@ impl Puzzle {
                 output.push(Cage::new(
                     excess_difference,
                     excess_cage.sum - parent_cage.sum,
+                    false,
                 ));
             }
             if 0 < parent_cage.cells.len() && parent_cage.cells.len() <= MAX_DERIVED_CAGE_SIZE {
@@ -102,7 +105,7 @@ impl Puzzle {
 
     pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>) {
         for (sum, cells) in cages {
-            self.cages.insert(Cage::new(cells, sum));
+            self.cages.insert(Cage::new(cells, sum, true));
         }
         let check = self.check_cages(4);
         if check.len() > 0 {
@@ -140,10 +143,14 @@ impl Puzzle {
         get_population_distribution(&mut minimal_cage_size.iter(), |x| *x)
     }
 
-    pub fn solve(&mut self) -> bool {
-        self.cages.iter().for_each(|cage| {
-            cage.restrict_by_uniform_combination(&mut self.board);
-        });
+    fn reduce_by_combination(&mut self) -> bool {
+        self.cages.iter().fold(false, |progress, cage| {
+            cage.restrict_by_combination(&mut self.board) | progress
+        })
+    }
+
+    fn reduce_by_partition(&mut self) -> bool {
+        let mut progress = false;
         loop {
             println!(
                 "cage_dist = {:?}, solvability = {:?}",
@@ -159,6 +166,7 @@ impl Puzzle {
                 })
                 .collect::<Vec<_>>();
             if substitutions.len() > 0 {
+                progress = true;
                 substitutions.into_iter().for_each(
                     |(original_cage, (new_cage, remaining_cage))| {
                         self.cages.remove(&original_cage);
@@ -169,6 +177,16 @@ impl Puzzle {
             } else {
                 break;
             }
+        }
+        progress
+    }
+
+    pub fn solve(&mut self) -> bool {
+        self.cages.iter().for_each(|cage| {
+            cage.restrict_by_uniform_combination(&mut self.board);
+        });
+        while self.reduce_by_combination() {
+            self.reduce_by_partition();
         }
 
         /* Final return value */
