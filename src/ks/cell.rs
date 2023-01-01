@@ -29,10 +29,12 @@ impl Cell {
         popcnt64(self.possible_values)
     }
 
-    pub fn restrict_to(&mut self, possible_values: u64) {
+    pub fn restrict_to(&mut self, possible_values: u64) -> Result<(), ()> {
         self.possible_values &= possible_values;
         if self.possible_values == 0 {
-            panic!()
+            Err(())
+        } else {
+            Ok(())
         }
     }
 
@@ -65,7 +67,7 @@ mod tests {
         assert_eq!(c.get_solution(), None);
         assert!(c.allows(1));
         assert!(c.allows(3));
-        c.restrict_to(1 << 3);
+        c.restrict_to(1 << 3).unwrap();
         assert_eq!(c.get_solution(), Some(3));
         assert!(!c.allows(1));
         assert!(c.allows(3));

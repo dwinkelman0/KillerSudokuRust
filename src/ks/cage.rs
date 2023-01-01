@@ -92,18 +92,18 @@ impl Cage {
     }
 
     /// Returns true if progress was made
-    pub fn restrict_by_uniform_combination(&self, board: &mut [Cell; 81]) -> bool {
+    pub fn restrict_by_uniform_combination(&self, board: &mut [Cell; 81]) -> Result<bool, ()> {
         let init_degrees_of_freedom = self.get_degrees_of_freedom(board);
         let combinations_union = get_combinations_union(self.cells.len(), self.sum);
-        self.cells.iter().for_each(|cell_index| {
-            board[*cell_index].restrict_to(combinations_union);
-        });
-        self.get_degrees_of_freedom(board) < init_degrees_of_freedom
+        self.cells
+            .iter()
+            .try_for_each(|cell_index| board[*cell_index].restrict_to(combinations_union))?;
+        Ok(self.get_degrees_of_freedom(board) < init_degrees_of_freedom)
     }
 
-    pub fn check_for_partitions(&self, board: &mut [Cell; 81]) -> Option<(Cage, Cage)> {
+    pub fn check_for_partitions(&self, board: &mut [Cell; 81]) -> Result<Option<(Cage, Cage)>, ()> {
         if !self.uniqueness {
-            return None;
+            return Ok(None);
         }
 
         fn fold_combinations(
@@ -165,19 +165,19 @@ impl Cage {
                 assert_eq!(popcnt64(cells), popcnt64(values));
                 let new_cage_cells = gather_cell_indices(cells, true);
                 for cell in new_cage_cells.iter() {
-                    board[*cell].restrict_to(values);
+                    board[*cell].restrict_to(values)?;
                 }
                 let new_cage_sum = PossibleValues::new(values).sum::<usize>();
                 let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
                 let remaining_cage_cells = gather_cell_indices(cells, false);
                 for cell in remaining_cage_cells.iter() {
-                    board[*cell].restrict_to(!values);
+                    board[*cell].restrict_to(!values)?;
                 }
                 let remaining_cage_sum = self.sum - new_cage_sum;
                 let remaining_cage =
                     Cage::new(remaining_cage_cells, remaining_cage_sum, self.uniqueness);
-                remaining_cage.restrict_by_uniform_combination(board);
-                return Some((new_cage, remaining_cage));
+                remaining_cage.restrict_by_uniform_combination(board)?;
+                return Ok(Some((new_cage, remaining_cage)));
             }
         }
 
@@ -204,7 +204,7 @@ impl Cage {
             v
         };
         if possible_cells_by_value.len() > self.cells.len() {
-            return None;
+            return Ok(None);
         }
         for i in 1..=(possible_cells_by_value.len() - 1) {
             if let Some((values, cells)) = fold_combinations(0, i, i, &possible_cells_by_value)
@@ -214,42 +214,42 @@ impl Cage {
                 assert_eq!(popcnt64(cells), popcnt64(values));
                 let new_cage_cells = gather_cell_indices(cells, true);
                 for cell in new_cage_cells.iter() {
-                    board[*cell].restrict_to(values);
+                    board[*cell].restrict_to(values)?;
                 }
                 let new_cage_sum = PossibleValues::new(values).sum::<usize>();
                 let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
                 let remaining_cage_cells = gather_cell_indices(cells, false);
                 for cell in remaining_cage_cells.iter() {
-                    board[*cell].restrict_to(!values);
+                    board[*cell].restrict_to(!values)?;
                 }
                 let remaining_cage_sum = self.sum - new_cage_sum;
                 let remaining_cage =
                     Cage::new(remaining_cage_cells, remaining_cage_sum, self.uniqueness);
-                remaining_cage.restrict_by_uniform_combination(board);
-                return Some((new_cage, remaining_cage));
+                remaining_cage.restrict_by_uniform_combination(board)?;
+                return Ok(Some((new_cage, remaining_cage)));
             }
         }
 
-        None
+        Ok(None)
     }
 
     /// Returns true if progress was made
-    pub fn restrict_by_combination(&self, board: &mut [Cell; 81]) -> bool {
+    pub fn restrict_by_combination(&self, board: &mut [Cell; 81]) -> Result<bool, ()> {
         match self.cells.len() {
             0 => panic!("Invalid condition"),
-            1 => false,
+            1 => Ok(false),
             2 => {
                 let get_complement_bits = |mask: u64| {
                     (mask.reverse_bits() >> (64 - self.sum - 1)) & ((1 << self.sum) - 2)
                 };
                 let a_mask = board[self.cells[0]].get_bits();
                 let b_mask = board[self.cells[1]].get_bits();
-                board[self.cells[1]].restrict_to(get_complement_bits(a_mask));
-                board[self.cells[0]].restrict_to(get_complement_bits(b_mask));
-                (a_mask != board[self.cells[0]].get_bits())
-                    || (b_mask != board[self.cells[1]].get_bits())
+                board[self.cells[1]].restrict_to(get_complement_bits(a_mask))?;
+                board[self.cells[0]].restrict_to(get_complement_bits(b_mask))?;
+                Ok((a_mask != board[self.cells[0]].get_bits())
+                    || (b_mask != board[self.cells[1]].get_bits()))
             }
-            _ => false,
+            _ => Ok(false),
         }
     }
 }

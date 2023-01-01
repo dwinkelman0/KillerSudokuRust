@@ -27,6 +27,7 @@ pub fn onehot(x: u64) -> Option<usize> {
     })
 }
 
+#[allow(unused)]
 pub fn get_population_distribution<T>(
     data: &mut dyn Iterator<Item = &T>,
     size_fn: fn(&T) -> usize,

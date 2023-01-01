@@ -4,8 +4,10 @@ use crate::ks::{cage::Cage, cell::Cell, util::get_population_distribution};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
+    thread,
 };
 
+#[derive(Clone)]
 pub struct Puzzle {
     pub board: [Cell; 81],
     cages: BTreeSet<Cage>,
@@ -143,28 +145,21 @@ impl Puzzle {
         get_population_distribution(&mut minimal_cage_size.iter(), |x| *x)
     }
 
-    fn reduce_by_combination(&mut self) -> bool {
-        self.cages.iter().fold(false, |progress, cage| {
-            cage.restrict_by_combination(&mut self.board) | progress
+    fn reduce_by_combination(&mut self) -> Result<bool, ()> {
+        self.cages.iter().try_fold(false, |progress, cage| {
+            Ok(cage.restrict_by_combination(&mut self.board)? | progress)
         })
     }
 
-    fn reduce_by_partition(&mut self) -> bool {
+    fn reduce_by_partition(&mut self) -> Result<bool, ()> {
         let mut progress = false;
         loop {
-            println!(
-                "cage_dist = {:?}, solvability = {:?}",
-                self.get_cage_size_distribution(),
-                self.get_cell_solvability_distribution()
-            );
-            let substitutions = self
-                .cages
-                .iter()
-                .filter_map(|cage| {
-                    cage.check_for_partitions(&mut self.board)
-                        .map(|res| (cage.clone(), res))
-                })
-                .collect::<Vec<_>>();
+            let substitutions = self.cages.iter().try_fold(vec![], |mut accum, cage| {
+                if let Some(res) = cage.check_for_partitions(&mut self.board)? {
+                    accum.push((cage.clone(), res))
+                }
+                Ok(accum)
+            })?;
             if substitutions.len() > 0 {
                 progress = true;
                 substitutions.into_iter().for_each(
@@ -178,19 +173,69 @@ impl Puzzle {
                 break;
             }
         }
-        progress
+        Ok(progress)
     }
 
-    pub fn solve(&mut self) -> bool {
-        self.cages.iter().for_each(|cage| {
-            cage.restrict_by_uniform_combination(&mut self.board);
-        });
-        while self.reduce_by_combination() {
-            self.reduce_by_partition();
+    fn solve_until_stuck(&mut self) -> Result<bool, ()> {
+        self.cages.iter().try_for_each(|cage| {
+            cage.restrict_by_uniform_combination(&mut self.board)?;
+            Ok(())
+        })?;
+        while self.reduce_by_combination()? {
+            self.reduce_by_partition()?;
         }
 
         /* Final return value */
-        self.board.iter().all(|cell| cell.get_solution().is_some())
+        Ok(self.board.iter().all(|cell| cell.get_solution().is_some()))
+    }
+
+    fn solve_until_stuck_then_guess_and_fork(&mut self, depth: usize) -> Result<Vec<Puzzle>, ()> {
+        const RECURSION_LIMIT: usize = 10;
+        if self.solve_until_stuck()? {
+            Ok(vec![self.clone()])
+        } else if depth > RECURSION_LIMIT {
+            Ok(vec![])
+        } else {
+            /* Figure out how many cells each cell influences */
+            let mut cage_count = vec![BTreeSet::new(); 81];
+            for cage in self.cages.iter() {
+                if cage.uniqueness {
+                    for cell_index_a in cage.cells.iter() {
+                        for cell_index_b in cage.cells.iter() {
+                            cage_count[*cell_index_a].insert(*cell_index_b);
+                        }
+                    }
+                }
+            }
+            let guess_index = cage_count
+                .into_iter()
+                .enumerate()
+                .filter(|(i, _)| self.board[*i].get_solution().is_none())
+                .max_by_key(|(i, cells)| cells.len() / self.board[*i].num_possible_solutions())
+                .map(|(i, _)| i)
+                .unwrap();
+            let res = self.board[guess_index]
+                .possible_values()
+                .map(|guess_value| {
+                    let guess_index = guess_index;
+                    let mut puzzle_copy = self.clone();
+                    thread::spawn(move || {
+                        puzzle_copy.board[guess_index]
+                            .restrict_to(1 << guess_value)
+                            .unwrap();
+                        puzzle_copy.solve_until_stuck_then_guess_and_fork(depth + 1)
+                    })
+                })
+                .filter_map(|handle| handle.join().unwrap().ok())
+                .flatten()
+                .collect();
+            Ok(res)
+        }
+    }
+
+    pub fn solve(&self) -> Result<Vec<Puzzle>, ()> {
+        let mut working_copy = self.clone();
+        working_copy.solve_until_stuck_then_guess_and_fork(0)
     }
 }
 
