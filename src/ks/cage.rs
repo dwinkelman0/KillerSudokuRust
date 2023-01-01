@@ -137,6 +137,16 @@ impl Cage {
             }
         }
 
+        let gather_cell_indices = |cells: u64, is_positive: bool| {
+            self.cells
+                .iter()
+                .enumerate()
+                .filter_map(|(i, cell_index)| {
+                    ((((cells >> i) & 1) == 1) ^ !is_positive).then_some(*cell_index)
+                })
+                .collect::<Vec<usize>>()
+        };
+
         let possible_values_by_cell = {
             let mut v = self
                 .cells
@@ -152,26 +162,14 @@ impl Cage {
                 .first()
                 .cloned()
             {
-                if popcnt64(cells) != popcnt64(values) {
-                    return None;
-                }
-                let new_cage_cells = self
-                    .cells
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, cell_index)| (((cells >> i) & 1) == 1).then_some(*cell_index))
-                    .collect::<Vec<usize>>();
+                assert_eq!(popcnt64(cells), popcnt64(values));
+                let new_cage_cells = gather_cell_indices(cells, true);
                 for cell in new_cage_cells.iter() {
                     board[*cell].restrict_to(values);
                 }
                 let new_cage_sum = PossibleValues::new(values).sum::<usize>();
                 let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
-                let remaining_cage_cells = self
-                    .cells
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, cell_index)| (((cells >> i) & 1) == 0).then_some(*cell_index))
-                    .collect::<Vec<usize>>();
+                let remaining_cage_cells = gather_cell_indices(cells, false);
                 for cell in remaining_cage_cells.iter() {
                     board[*cell].restrict_to(!values);
                 }
@@ -183,26 +181,55 @@ impl Cage {
             }
         }
 
-        // let possible_cells_by_value = {
-        //     let mut v = (1..=9)
-        //         .map(|value| {
-        //             self.cells
-        //                 .iter()
-        //                 .enumerate()
-        //                 .fold(0, |accum, (i, cell_index)| {
-        //                     if board[*cell_index].allows(value) {
-        //                         accum | (1 << i)
-        //                     } else {
-        //                         accum
-        //                     }
-        //                 })
-        //         })
-        //         .enumerate()
-        //         .filter(|(_, possible_cells)| popcnt64(*possible_cells) > 0)
-        //         .collect::<Vec<(usize, u64)>>();
-        //     v.sort_by_key(|(_, possible_cells)| popcnt64(*possible_cells));
-        //     v
-        // };
+        let possible_cells_by_value = {
+            let mut v = (1..=9)
+                .map(|value| {
+                    (
+                        value,
+                        self.cells
+                            .iter()
+                            .enumerate()
+                            .fold(0, |accum, (i, cell_index)| {
+                                if board[*cell_index].allows(value) {
+                                    accum | (1 << i)
+                                } else {
+                                    accum
+                                }
+                            }),
+                    )
+                })
+                .filter(|(_, possible_cells)| popcnt64(*possible_cells) > 0)
+                .collect::<Vec<(usize, u64)>>();
+            v.sort_by_key(|(_, possible_cells)| popcnt64(*possible_cells));
+            v
+        };
+        if possible_cells_by_value.len() > self.cells.len() {
+            return None;
+        }
+        for i in 1..=(possible_cells_by_value.len() - 1) {
+            if let Some((values, cells)) = fold_combinations(0, i, i, &possible_cells_by_value)
+                .first()
+                .cloned()
+            {
+                assert_eq!(popcnt64(cells), popcnt64(values));
+                let new_cage_cells = gather_cell_indices(cells, true);
+                for cell in new_cage_cells.iter() {
+                    board[*cell].restrict_to(values);
+                }
+                let new_cage_sum = PossibleValues::new(values).sum::<usize>();
+                let new_cage = Cage::new(new_cage_cells, new_cage_sum, self.uniqueness);
+                let remaining_cage_cells = gather_cell_indices(cells, false);
+                for cell in remaining_cage_cells.iter() {
+                    board[*cell].restrict_to(!values);
+                }
+                let remaining_cage_sum = self.sum - new_cage_sum;
+                let remaining_cage =
+                    Cage::new(remaining_cage_cells, remaining_cage_sum, self.uniqueness);
+                remaining_cage.restrict_by_uniform_combination(board);
+                return Some((new_cage, remaining_cage));
+            }
+        }
+
         None
     }
 
