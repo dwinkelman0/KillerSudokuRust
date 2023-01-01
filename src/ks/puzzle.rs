@@ -1,6 +1,8 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
-use crate::ks::{cage::Cage, cell::Cell, util::get_population_distribution};
+use crate::ks::{
+    cage::Cage, cell::Cell, io::SerializablePuzzle, util::get_population_distribution,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
@@ -41,6 +43,17 @@ impl Puzzle {
                 ));
             }
         }
+        output
+    }
+
+    pub fn from_serializable(s: SerializablePuzzle) -> Self {
+        let mut output = Puzzle::new();
+        output.init_cages(
+            s.cages
+                .into_iter()
+                .map(|cage| (cage.sum, cage.cell_indices))
+                .collect(),
+        );
         output
     }
 
