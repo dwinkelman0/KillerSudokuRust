@@ -1,5 +1,7 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
+use std::collections::BTreeMap;
+
 pub fn popcnt64(x: u64) -> usize {
     let mut output = x;
     output = (output & 0x5555555555555555) + ((output & 0xaaaaaaaaaaaaaaaa) >> 1);
@@ -23,6 +25,17 @@ pub fn onehot(x: u64) -> Option<usize> {
         }
         output as usize
     })
+}
+
+pub fn get_population_distribution<T>(
+    data: &mut dyn Iterator<Item = &T>,
+    size_fn: fn(&T) -> usize,
+) -> BTreeMap<usize, usize> {
+    let mut size_map = BTreeMap::new();
+    for size in data.map(size_fn) {
+        *size_map.entry(size).or_insert(0) += 1;
+    }
+    size_map
 }
 
 #[cfg(test)]

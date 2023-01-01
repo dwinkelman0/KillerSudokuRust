@@ -1,6 +1,6 @@
 // Copyright 2022 by Daniel Winkelman. All rights reserved.
 
-use crate::ks::{cage::Cage, cell::Cell};
+use crate::ks::{cage::Cage, cell::Cell, util::get_population_distribution};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
@@ -98,10 +98,6 @@ impl Puzzle {
                 .join(", "),
         );
         self.cages.append(&mut new_cages);
-        println!(
-            "solvability = {:?}",
-            self.get_cell_solvability_distribution()
-        );
     }
 
     pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>) {
@@ -128,6 +124,11 @@ impl Puzzle {
             .collect()
     }
 
+    /// Get the distribution of cages by size
+    pub fn get_cage_size_distribution(&self) -> BTreeMap<usize, usize> {
+        get_population_distribution(&mut self.cages.iter(), |cage: &Cage| cage.cells.len())
+    }
+
     /// For each cell, take the size of the smallest cage of which it is a member, and aggregate
     pub fn get_cell_solvability_distribution(&self) -> BTreeMap<usize, usize> {
         let mut minimal_cage_size = vec![9; 81];
@@ -136,11 +137,7 @@ impl Puzzle {
                 minimal_cage_size[*cell] = minimal_cage_size[*cell].min(cage.cells.len());
             }
         }
-        let mut cage_size_count = BTreeMap::new();
-        for size in minimal_cage_size {
-            *cage_size_count.entry(size).or_insert(0) += 1;
-        }
-        cage_size_count
+        get_population_distribution(&mut minimal_cage_size.iter(), |x| *x)
     }
 
     pub fn solve(&mut self) -> bool {
@@ -148,44 +145,31 @@ impl Puzzle {
             cage.restrict_by_uniform_combination(&mut self.board);
         });
         loop {
-            let partitions = self
+            println!(
+                "cage_dist = {:?}, solvability = {:?}",
+                self.get_cage_size_distribution(),
+                self.get_cell_solvability_distribution()
+            );
+            let substitutions = self
                 .cages
                 .iter()
                 .filter_map(|cage| {
-                    cage.check_for_partition(&mut self.board)
-                        .map(|p| (cage.clone(), p))
+                    cage.check_for_partitions(&mut self.board)
+                        .map(|res| (cage.clone(), res))
                 })
-                .collect::<Vec<(Cage, Vec<Cage>)>>();
-            match partitions.len() {
-                0 => break,
-                _ => {
-                    let init_num_cages = self.cages.len();
-                    partitions
-                        .into_iter()
-                        .rev()
-                        .for_each(|(original_cage, new_cages)| {
-                            self.cages.remove(&original_cage);
-                            new_cages.into_iter().for_each(|new_cage| {
-                                self.cages.insert(new_cage);
-                            });
-                        });
-                }
+                .collect::<Vec<_>>();
+            if substitutions.len() > 0 {
+                substitutions.into_iter().for_each(
+                    |(original_cage, (new_cage, remaining_cage))| {
+                        self.cages.remove(&original_cage);
+                        self.cages.insert(new_cage);
+                        self.cages.insert(remaining_cage);
+                    },
+                );
+            } else {
+                break;
             }
-            println!(
-                "solvability = {:?}",
-                self.get_cell_solvability_distribution()
-            );
         }
-        // loop {
-        //     // TODO: turn off short-circuit evalution
-        //     let any_progress = self.cages.iter_mut().fold(false, |any_progress, cage| {
-        //         any_progress || cage.restrict(&mut self.board)
-        //     });
-        //     match any_progress {
-        //         true => println!("Made progress"),
-        //         false => break,
-        //     }
-        // }
 
         /* Final return value */
         self.board.iter().all(|cell| cell.get_solution().is_some())
