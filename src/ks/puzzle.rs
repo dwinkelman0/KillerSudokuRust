@@ -53,6 +53,7 @@ impl Puzzle {
                 .into_iter()
                 .map(|cage| (cage.sum, cage.cell_indices))
                 .collect(),
+            true,
         );
         output
     }
@@ -118,15 +119,17 @@ impl Puzzle {
         self.cages.append(&mut new_cages);
     }
 
-    pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>) {
+    pub fn init_cages(&mut self, cages: Vec<(usize, Vec<usize>)>, perform_checks: bool) {
         for (sum, cells) in cages {
             self.cages.insert(Cage::new(cells, sum, true));
         }
-        let check = self.check_cages(4);
-        if check.len() > 0 {
-            panic!("Cells in cages are not balanced: {:?}", check);
+        if perform_checks {
+            let check = self.check_cages(4);
+            if check.len() > 0 {
+                panic!("Cells in cages are not balanced: {:?}", check);
+            }
+            self.derive_cages();
         }
-        self.derive_cages();
     }
 
     fn check_cages(&self, expected: usize) -> Vec<(usize, usize)> {
@@ -194,6 +197,7 @@ impl Puzzle {
             cage.restrict_by_uniform_combination(&mut self.board)?;
             Ok(())
         })?;
+        self.reduce_by_partition()?;
         while self.reduce_by_combination()? {
             self.reduce_by_partition()?;
         }

@@ -2,13 +2,16 @@
 
 mod ks;
 
-use ks::{io::SerializablePuzzle, puzzle::Puzzle};
+use ks::generator::Generator;
 
-fn main() {}
+fn main() {
+    let gen = Generator::new();
+    println!("{}", gen.serialize().to_str().unwrap());
+}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::ks::{io::SerializablePuzzle, puzzle::Puzzle};
 
     #[test]
     fn solve_from_file() {

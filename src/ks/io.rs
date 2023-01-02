@@ -37,4 +37,8 @@ impl SerializablePuzzle {
             self,
         )?)
     }
+
+    pub fn to_str(&self) -> Result<String, Box<dyn Error>> {
+        Ok(serde_json::to_string(self)?)
+    }
 }
