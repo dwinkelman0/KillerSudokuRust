@@ -53,7 +53,6 @@ mod tests {
     fn test_onehot() {
         assert_eq!(onehot(0x3), None);
         for i in 0..64 {
-            println!("test {i}");
             assert_eq!(onehot(1 << i), Some(i));
         }
     }

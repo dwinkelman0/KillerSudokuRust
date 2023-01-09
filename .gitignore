@@ -1,1 +1,4 @@
 /target
+/puzzles
+/output.json
+.DS_Store

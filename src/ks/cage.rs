@@ -93,12 +93,16 @@ impl Cage {
 
     /// Returns true if progress was made
     pub fn restrict_by_uniform_combination(&self, board: &mut [Cell; 81]) -> Result<bool, ()> {
-        let init_degrees_of_freedom = self.get_degrees_of_freedom(board);
-        let combinations_union = get_combinations_union(self.cells.len(), self.sum);
-        self.cells
-            .iter()
-            .try_for_each(|cell_index| board[*cell_index].restrict_to(combinations_union))?;
-        Ok(self.get_degrees_of_freedom(board) < init_degrees_of_freedom)
+        if self.uniqueness {
+            let init_degrees_of_freedom = self.get_degrees_of_freedom(board);
+            let combinations_union = get_combinations_union(self.cells.len(), self.sum)?;
+            self.cells
+                .iter()
+                .try_for_each(|cell_index| board[*cell_index].restrict_to(combinations_union))?;
+            Ok(self.get_degrees_of_freedom(board) < init_degrees_of_freedom)
+        } else {
+            Ok(false)
+        }
     }
 
     pub fn check_for_partitions(&self, board: &mut [Cell; 81]) -> Result<Option<(Cage, Cage)>, ()> {

@@ -107,15 +107,15 @@ impl Puzzle {
         for cage in new_cages.iter() {
             *cage_len_count.entry(cage.cells.len()).or_insert(0) += 1;
         }
-        println!(
-            "Derived {} new cages ({})",
-            new_cages.len(),
-            cage_len_count
-                .iter()
-                .map(|(len, count)| { format!("{count} cages with {len} cells") })
-                .collect::<Vec<String>>()
-                .join(", "),
-        );
+        // println!(
+        //     "Derived {} new cages ({})",
+        //     new_cages.len(),
+        //     cage_len_count
+        //         .iter()
+        //         .map(|(len, count)| { format!("{count} cages with {len} cells") })
+        //         .collect::<Vec<String>>()
+        //         .join(", "),
+        // );
         self.cages.append(&mut new_cages);
     }
 
@@ -146,11 +146,13 @@ impl Puzzle {
     }
 
     /// Get the distribution of cages by size
+    #[allow(unused)]
     pub fn get_cage_size_distribution(&self) -> BTreeMap<usize, usize> {
         get_population_distribution(&mut self.cages.iter(), |cage: &Cage| cage.cells.len())
     }
 
     /// For each cell, take the size of the smallest cage of which it is a member, and aggregate
+    #[allow(unused)]
     pub fn get_cell_solvability_distribution(&self) -> BTreeMap<usize, usize> {
         let mut minimal_cage_size = vec![9; 81];
         for cage in self.cages.iter() {
@@ -211,7 +213,7 @@ impl Puzzle {
         if self.solve_until_stuck()? {
             Ok(vec![self.clone()])
         } else if depth > RECURSION_LIMIT {
-            Ok(vec![])
+            Err(())
         } else {
             /* Figure out how many cells each cell influences */
             let mut cage_count = vec![BTreeSet::new(); 81];
