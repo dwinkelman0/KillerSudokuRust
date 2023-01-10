@@ -107,15 +107,6 @@ impl Puzzle {
         for cage in new_cages.iter() {
             *cage_len_count.entry(cage.cells.len()).or_insert(0) += 1;
         }
-        // println!(
-        //     "Derived {} new cages ({})",
-        //     new_cages.len(),
-        //     cage_len_count
-        //         .iter()
-        //         .map(|(len, count)| { format!("{count} cages with {len} cells") })
-        //         .collect::<Vec<String>>()
-        //         .join(", "),
-        // );
         self.cages.append(&mut new_cages);
     }
 

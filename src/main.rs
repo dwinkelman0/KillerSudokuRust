@@ -5,15 +5,12 @@ mod ks;
 use ks::generator::Generator;
 
 fn main() {
-    // let gen = (0..50).fold(Generator::new(), |gen, _| gen.merge_cages());
     let mut gen = Generator::new_random();
     while gen.eliminate_cage() {
-        let serialized = gen.serialize();
-        serialized.to_json_file("output.json").unwrap();
-        println!("{} cages", serialized.cages.len());
+        gen.serialize().to_json_file("output.json").unwrap();
+        println!("{} cages", gen.get_num_cages());
     }
-    println!("{gen:?}");
-    println!("{}", gen.serialize().to_str().unwrap());
+    gen.serialize().to_svg_file("output.svg", "demo").unwrap();
 }
 
 #[cfg(test)]

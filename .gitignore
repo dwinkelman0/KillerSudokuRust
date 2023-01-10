@@ -2,3 +2,4 @@
 /puzzles
 /output.json
 .DS_Store
+*.svg
