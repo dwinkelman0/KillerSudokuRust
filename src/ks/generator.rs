@@ -147,6 +147,10 @@ impl Generator {
         }
     }
 
+    pub fn get_num_cages(&self) -> usize {
+        self.cages.len()
+    }
+
     fn try_merge_cages(&mut self, a: usize, b: usize) -> bool {
         /* Check that cage value uniqueness would be preserved */
         let get_cage_values = |cage_index| {
@@ -268,7 +272,11 @@ impl Generator {
                 /* Copy updated adjacent cage state */
                 self.cages.iter_mut().for_each(|(cage_index, cage)| {
                     if let Some(other_cage) = copy.cages.get(cage_index) {
-                        cage.adjacent_cages = other_cage.adjacent_cages.clone();
+                        cage.adjacent_cages = cage
+                            .adjacent_cages
+                            .intersection(&other_cage.adjacent_cages)
+                            .cloned()
+                            .collect();
                     } else {
                         cage.adjacent_cages.clear();
                     }
@@ -278,63 +286,6 @@ impl Generator {
             Err(()) => false,
         }
     }
-
-    // pub fn eliminate_cage(&self) -> Option<Self> {
-    //     let mut output = self.clone();
-    // }
-
-    // fn merge_cage(&mut self, old_cage_index: usize, new_cage_index: usize) -> bool {}
-
-    // pub fn eliminate_cage(&self) -> Self {
-    //     let mut output = self.clone();
-    //     loop {
-    //         match output.remaining_merges.pop() {
-    //             Some((index_a, index_b)) => {
-    //                 if output.cages[index_a] == output.cages[index_b] {
-    //                     /* These cells already belong to the same cage */
-    //                 } else {
-    //                     /* Rename one of the cages */
-    //                     let mut copy = output.clone();
-    //                     let old_cage_index = copy.cages[index_a];
-    //                     let new_cage_index = copy.cages[index_b];
-    //                     let merged_cage_values = copy
-    //                         .cages
-    //                         .iter_mut()
-    //                         .enumerate()
-    //                         .filter_map(|(i, cage)| {
-    //                             if *cage == old_cage_index {
-    //                                 *cage = new_cage_index
-    //                             }
-    //                             (*cage == new_cage_index).then_some(self.numbers[i])
-    //                         })
-    //                         .collect::<Vec<usize>>();
-
-    //                     /* Confirm that the new cage contains unique values */
-    //                     if merged_cage_values.len() < 6
-    //                         && merged_cage_values.len()
-    //                             == BTreeSet::from_iter(merged_cage_values.iter()).len()
-    //                     {
-    //                         /* Attempt to solve the puzzle */
-    //                         let puzzle = Puzzle::from_serializable(self.serialize());
-    //                         match puzzle.solve() {
-    //                             Ok(solutions) => {
-    //                                 if solutions.len() == 1 {
-    //                                     output = copy;
-    //                                     break;
-    //                                 }
-    //                             }
-    //                             Err(()) => {
-    //                                 println!("Error");
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //             None => break,
-    //         }
-    //     }
-    //     output
-    // }
 }
 
 #[cfg(test)]
